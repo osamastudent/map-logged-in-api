@@ -1,0 +1,371 @@
+@extends('companyAdmin.layouts.master')
+@section('page-title')
+Staff Visits
+@endsection
+@section('main-content')
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+    .list-container {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+    }
+    .list-container ul {
+        list-style-type: none;
+        padding: 0;
+    }
+    .list-container li {
+        padding: 5px 0;
+        border-bottom: 1px solid #ddd;
+    }
+    .list-container li:last-child {
+        border-bottom: none;
+    }
+    #map {
+            height: 500px;
+            width: 100%;
+    }
+</style>
+
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    
+                    <div class="row">
+                        <div class='col-md-9'>
+                            <div id="map"></div>
+                            <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+                           <script>
+                                var map = null;
+                                var markers = [];
+
+                                // Function to initialize or update the map with markers
+                                // Function to initialize or update the map with markers
+                            function initializeMap(coordinates) {
+                                var defaultLat = 30.3753; // Default latitude (Pakistan)
+                                var defaultLong = 69.3451; // Default longitude (Pakistan)
+                                var defaultZoom = 5;
+                            
+                                // Initialize the map if it's not already initialized
+                                if (!map) {
+                                    map = L.map('map').setView([defaultLat, defaultLong], defaultZoom);
+                            
+                                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                    }).addTo(map);
+                                }
+                            
+                                // Clear previous markers from the map
+                                markers.forEach(function(marker) {
+                                    map.removeLayer(marker);
+                                });
+                                markers = [];
+                            
+                                // Add new markers based on updated coordinates
+                                coordinates.forEach(function(coord, index) {
+                                    var lat = parseFloat(coord.map_lat);
+                                    var long = parseFloat(coord.map_long);
+                            
+                                    if (!isNaN(lat) && !isNaN(long)) {
+                                        // Create marker
+                                        var marker = L.marker([lat, long]).addTo(map);
+                                        markers.push(marker); // Store marker in markers array
+                            
+                                        // Create popup content
+                                        var popupContent = `
+                                            <strong>Staff Name:</strong> ${coord.staff.name} <br>
+                                            <strong>Date:</strong> ${new Date(coord.created_at).toLocaleDateString()} <br>
+                                            <strong>Time:</strong> ${new Date(coord.created_at).toLocaleTimeString()} <br>
+                                        `;
+                                        marker.bindPopup(popupContent); // Bind popup to marker
+                            
+                                        // Add click functionality to focus on this marker
+                                        const listItem = document.getElementById(`staff-${index}`);
+                                        if (listItem) {
+                                            listItem.addEventListener('click', function() {
+                                                map.setView([lat, long], 15); // Zoom in to the specific location
+                                                marker.openPopup(); // Open the popup for the selected marker
+                                            });
+                                        }
+                                    } else {
+                                        console.warn('Invalid coordinates:', coord);
+                                    }
+                                });
+                            }
+                            
+                            // Function to fetch active staff data and update the map and list
+                            function fetchActiveStaffAndMap() {
+                                fetch('{{ route('company-staff-visit.fetch.active.staff') }}')
+                                    .then(response => response.json())
+                                    .then(data => {
+                                        const activeStaffList = document.getElementById('activeStaffList');
+                                        activeStaffList.innerHTML = ''; // Clear existing list
+                            
+                                        if (data.length > 0) {
+                                            // Extract coordinates for active staff
+                                            const coordinates = data.map((staffAttendance, index) => {
+                                                const staffMember = staffAttendance.staff;
+                            
+                                                // Add staff member to the list
+                                                if (staffMember && (!staffAttendance.end_day || staffAttendance.end_day === '')) {
+                                                    const listItem = document.createElement('li');
+                                                    listItem.id = `staff-${index}`; // Add a unique ID to the list item
+                                                    listItem.textContent = staffMember.name + ' ';
+                            
+                                                    const indicator = document.createElement('span');
+                                                    indicator.className = 'online-indicator text-success';
+                                                    indicator.textContent = '\u2022';
+                                                    listItem.appendChild(indicator);
+                            
+                                                    activeStaffList.appendChild(listItem);
+                                                }
+                            
+                                                // Return coordinates with staff details
+                                                return {
+                                                    map_lat: staffAttendance.map_lat,
+                                                    map_long: staffAttendance.map_long,
+                                                    staff: staffAttendance.staff,
+                                                    created_at: staffAttendance.created_at
+                                                };
+                                            });
+                            
+                                            // Initialize or update the map with new coordinates
+                                            initializeMap(coordinates);
+                            
+                                            // Hide no active staff message if visible
+                                            document.getElementById('noActiveStaffMessage').style.display = 'none';
+                                        } else {
+                                            // Display message when no active staff
+                                            document.getElementById('noActiveStaffMessage').style.display = 'block';
+                                            initializeMap([]); // Clear map
+                                        }
+                                    })
+                                    .catch(error => console.error('Error fetching active staff:', error));
+                            }
+                            
+                            // Initial fetch when the page loads
+                            fetchActiveStaffAndMap();
+                            
+                            // Refresh the active staff list and map markers every 10 seconds
+                            setInterval(fetchActiveStaffAndMap, 10000);
+
+                            </script>
+                        </div>
+                        <div class='col-md-3' id="activeStaffContainer">
+                            <h3>Staff osama</h3>
+                            <div class="list-container">
+                                <ul id="activeStaffList">
+                                  
+                                </ul>
+                                <div id="noActiveStaffMessage" style="display: none; margin-top: 10px;">
+                                    No Active Staff
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+        </div>
+    </div>
+</div>
+
+
+@endsection
+
+<?php
+
+namespace App\Http\Controllers\companyAdmin;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Models\Customer;
+use App\Models\Zone;
+use App\Models\Vendor;
+use App\Models\Staff;
+use App\Models\Staff_Attendance;
+use App\Models\Staff_Visit;
+use Auth;
+use DB;
+use Hash;
+
+class Staff_VisitsController extends Controller
+{
+    public function index()
+    {
+        $userId = Auth::id();
+        $staff_visit = Staff_Visit::where('created_by', $userId)->get();
+        return view('companyAdmin.Staff_Visit.index', compact('staff_visit'));
+       
+    }
+    
+    public function getAttendanceCoordinates()
+    {   
+        $userId = Auth::id();
+    
+        $activeStaffIds = Staff_Attendance::where(function ($query) {
+        $query->whereNull('end_day');})
+        ->where('created_by', $userId)
+        ->pluck('staff_id')->toArray();
+
+        $staff = Staff::whereIn('id', $activeStaffIds)->get(['id', 'name']);
+        
+       $coordinates = Staff_Attendance::whereNull('end_day')
+    ->select('map_lat', 'map_long', 'staff_id', 'created_at')
+    ->with('staff:id,name') // Ensure eager loading
+    ->get()
+    ->map(function ($item) {
+        $item->staff_name = $item->staff->name ?? 'Unknown Staff'; // Handle null staff
+        return $item;
+    });
+
+        // dd($coordinates);
+        return view('companyAdmin.Staff_Visit.map', compact('coordinates','staff'));
+    }
+    
+    public function fetchActiveStaff()
+    {
+        $userId = Auth::id();
+        $activeStaff = Staff_Attendance::whereNull('end_day')
+        ->where('created_by', $userId)
+        ->with('staff:id,name')
+        ->get();
+
+        return response()->json($activeStaff);
+    }
+
+    
+    public function list()
+    {
+        $userId = Auth::id();
+      
+        $staff_visit = Staff_Visit::with(['staff', 'centre'])
+                    ->where('created_by', $userId)
+                    ->latest()
+                    ->get();
+        return view('companyAdmin.Staff_Visit.list', compact('staff_visit'));
+       
+    }
+    public function create()
+    {
+
+    return view('companyAdmin.staffs.create');
+  }
+  
+    public function store(Request $request)
+{
+    // Validate the incoming data
+    $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'address' => ['required', 'string', 'max:255'],
+        'phone_number' => ['required', 'string', 'max:20'],
+        'email' => ['required', 'string', 'email', 'max:255', 'unique:staff,email'], // Ensure email is unique
+        'id_card_no' => ['required', 'string', 'max:20', 'unique:staff,id_card_no'], // Ensure ID is unique
+        'password' => ['required', 'string', 'min:8', 'confirmed'], // Ensures password and confirm_password match
+        'centre_id' => ['required', 'exists:centres,id'], // Ensure the centre_id exists in the centres table
+    ]);
+
+    try {
+        // Create a new staff record
+        Staff::create([
+            'name' => $request->name,
+            'address' => $request->address,
+            'phone_number' => $request->phone_number,
+            'email' => $request->email,
+            'password' => Hash::make($request->password), // Hash the password
+            'id_card_no' => $request->id_card_no,
+            'centre_id' => $request->centre_id, // Store the centre ID
+            'created_by' => Auth::id(), // Use the authenticated user ID
+        ]);
+
+        // Redirect with success message
+        return redirect()->route('company-staff.index')->with('success', 'Staff added successfully!');
+    } catch (\Exception $e) {
+        // Handle errors and redirect with failure message
+        return redirect()->back()->with('error', 'Failed to add staff. Please try again.');
+    }
+}
+
+    
+    public function show($id)
+    {  
+        $staff = Staff::find($id);
+       
+        return view('companyAdmin.staffs.show', compact('staff'));
+    }
+    
+    public function attendance()
+    {  
+        $userId = Auth::id();
+        // $attendance = Staff_Attendance::where('created_by', $userId)->get();
+        $query = Staff_Attendance::join('staff', 'staff.id', '=', 'staff__attendances.staff_id')
+                ->where('staff__attendances.created_by', $userId)
+                ->select('staff__attendances.*', 'staff.name')
+                ->latest();
+                    
+        $attendance = $query->get()->map(function ($item) {
+        $start = Carbon::parse($item->start_day);
+        if ($item->end_day) {
+            $end = Carbon::parse($item->end_day);
+            $totalMinutes = $end->diffInMinutes($start);
+            $hours = floor($totalMinutes / 60);
+            $minutes = $totalMinutes % 60;
+            $item->working_hours = $hours . ' hours ' . $minutes . ' minutes';
+        } else {
+            $item->working_hours = 'On Work';
+        }
+        return $item;
+    });
+        
+        return view('companyAdmin.staffs.attendance',compact('attendance'));
+    }
+    
+    public function edit($id)
+    {  
+        $staff = Staff::find($id);
+       
+        return view('companyAdmin.staffs.edit', compact('staff'));
+    }
+    
+    
+    public function update(Request $request, $id) 
+    {  
+        $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'address' => ['required', 'string', 'max:255'],
+        'phone_number' => ['required', 'string', 'max:20'],
+        'email' => ['required', 'string', 'email', 'max:255'],            
+        'id_card_no' => ['required', 'string', 'max:20'],
+        'password' => ['required', 'string' ],
+        'confirm_password' => ['required', 'string'],
+        ]);
+        
+        
+        $staff = Staff::find($id);
+        $staff->update([
+            'name' => $request->name,
+            'address' => $request->address,
+            'phone_number' => $request->phone_number,
+            'email' => $request->email,
+            'password' => $request->password,
+            'confirm_password' => $request->confirm_password,
+            'id_card_no' => $request->id_card_no,
+            'created_by' => Auth::user()->id,
+        ]);
+
+        return redirect()->route('company-staff.index')->with('success', 'Staff Updated Successfully!');
+
+       
+    }
+    
+    
+        public function delete($id)
+    {
+        $zones = Staff::findOrFail($id); 
+        $zones->delete();
+        return redirect()->route('company-staff.index')->with('success', 'Staff Deleted Successfully!');
+    }
+    
+}
+
+
